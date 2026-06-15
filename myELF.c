@@ -12,20 +12,10 @@
 struct fun_desc {
 char *name;
 char index;
-char (*fun)(char);
+char (*fun)(void);
 };
 
-struct fun_desc menu1[] = { 
-    { "Toggle <D>ebug Mode", 'D', toggle_debug_mode }, 
-    { "Examine ELF <F>ile", 'F', emamine_elf }, 
-    { "Print Section <N>ames", 'N', print_sections }, 
-    { "Print <S>ymbols", 'S', print_symbols }, 
-    { "Print <R>elocations", 'R', print_relocations }, 
-    { "<C>heck Files for Merge", 'C', check_files }, 
-    { "<M>erge ELF Files", 'M', merge }, 
-    { "<Q>uit", 'Q', quit }, 
-    { NULL, 0, NULL } 
-};
+
 
 
 //debug as in lab 4
@@ -60,6 +50,7 @@ void examine_elf() {
     printf("Enter file name: ");
     char filename[100];
     scanf("%s", filename);
+    while(getchar() != '\n');
 
     /*
     In Examine ELF File, after getting a file name, open the file for reading, and then print the following:
@@ -84,7 +75,7 @@ void examine_elf() {
 
 
 
-`//saving map details for cuurent file then saving it in arrays 
+//saving map details for cuurent file then saving it in arrays 
     //st.size is stat struct feature
     int size = fd_stat.st_size;
 
@@ -190,9 +181,67 @@ void quit() {
 
 
 
+void print_sections() {
+    printf("not implemented yet\n");
+}
+
+void print_symbols() {
+    printf("not implemented yet\n");
+}
+
+void print_relocations() {
+    printf("not implemented yet\n");
+}
+
+void check_files() {
+    printf("not implemented yet\n");
+}
+
+void merge() {
+    printf("not implemented yet\n");
+}
+
+    struct fun_desc menu1[] = { 
+    { "Toggle <D>ebug Mode", 'D', toggle_debug_mode }, 
+    { "Examine ELF <F>ile", 'F', examine_elf }, 
+    { "Print Section <N>ames", 'N', print_sections }, 
+    { "Print <S>ymbols", 'S', print_symbols }, 
+    { "Print <R>elocations", 'R', print_relocations }, 
+    { "<C>heck Files for Merge", 'C', check_files }, 
+    { "<M>erge ELF Files", 'M', merge }, 
+    { "<Q>uit", 'Q', quit },
+    { NULL, 0, NULL }
+    };
+
+
+
+
+void menu() {
+    while(feof(stdin) == 0) { 
+        fprintf(stdout, "Choose action:\n");
+        int idx = 0;
+        while(menu1[idx].fun != NULL) {
+            printf("%s\n", menu1[idx].name);
+            idx++;
+        }
+        char buffer[50];
+        if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+            break; 
+        }
+        int isError = 1;
+        for(int i = 0; menu1[i].fun != NULL; i++) {
+            if(buffer[0] == menu1[i].index) {
+                menu1[i].fun();
+                isError = 0;
+            }
+        }
+        if(isError == 1) {
+            printf("Invalid choice.\n");
+        }   
+    }      
+    exit(0);
+}
 int main() {
-    examine_elf();
-    if (map_start != NULL) munmap(map_start, file_size);
-    if (current_fd != -1) close(current_fd);
+    menu();
     return 0;
 }
