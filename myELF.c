@@ -186,7 +186,7 @@ File <ELF-file-name> sections:
  //so there is no file just print an error message and return.
 void print_sections(void) {
     if (num_files == 0) {
-        printf("Error: No ELF files currently mapped. Please examine a file first.\n");
+        printf("Error: No ELF files currently mapped\n");
         return;
     }
 
@@ -247,9 +247,92 @@ void print_sections(void) {
 
 
 
-
+//part 2
 void print_symbols() {
-    printf("not implemented yet\n");
+    //same as part 1. we need names table for printing in which section each symbol.
+        if (num_files == 0) {
+        printf("Error: No ELF files currently mapped.\n");
+        return;
+    }
+    for (int i = 0; i < num_files; i++) {
+        void *map = map_start[i];
+        Elf32_Ehdr *header = (Elf32_Ehdr *)map;
+        Elf32_Shdr *section_headers = (Elf32_Shdr *)((char *)map + header->e_shoff);
+        Elf32_Shdr *shstrtab_section = &section_headers[header->e_shstrndx];
+        char *shstrtab = (char *)map + shstrtab_section->sh_offset;
+
+
+        //iter the sections
+        for (int j = 0; j < header->e_shnum; j++) {
+            //pointer to 
+            Elf32_Shdr *current_section = &section_headers[j];
+            
+            //dymsym for symbs that solved in runtime like library functions 
+            if (current_section->sh_type == SHT_SYMTAB || current_section->sh_type == SHT_DYNSYM) {
+                
+                if (debug_mode) {
+                    fprintf(stderr, "Debug: Symbol table size = %d, number of symbols = %d\n", 
+                            current_section->sh_size, current_section->sh_size / current_section->sh_entsize);
+                }
+
+                char *symtab_name = shstrtab + current_section->sh_name;
+                printf("File %s symbols (from %s):\n", file_names[i], symtab_name);
+                printf("[index] Value section index section name         symbol name\n");
+                //symtab is array of structs. go to start + offset which takes us to the start of this section
+                //sym casting makes it an array of sym structs
+                Elf32_Sym *symtab = (Elf32_Sym *)((char *)map + current_section->sh_offset);
+                //total size/1 symbol size 
+                int num_symbols = current_section->sh_size / current_section->sh_entsize;
+                //shstrtab is for sections
+                //strtab is for symbols names
+                //shlink is index for the section number of symbols name
+                //so now this is a ptr to symbols names section:
+                Elf32_Shdr *strtab_section = &section_headers[current_section->sh_link];
+                //strtab is for all symbols names together
+                //and this is a ptr to actual symbols name start.(so we can look symbols name in it) 
+                //before the casting we are in a start of section that is sym tables(we can have more than 1 section like this)
+                char *strtab = (char *)map + strtab_section->sh_offset;
+
+
+                //iterate symbols
+                for (int k = 0; k < num_symbols; k++) {
+                    //ptr to current symbol. symtab[k] is sym struct, with & its pointer
+                    Elf32_Sym *sym = &symtab[k];
+                    //stname is like offset from the start of syrtab
+                    char *sym_name = strtab + sym->st_name;
+                    char *sec_name;
+
+
+                    //sym struct has st_shndx that says which section it belongs, some  sections types are special and doesnt represent actual header in the header nums range.
+                    //outside syms  (library functions)
+                    if (sym->st_shndx == SHN_UNDEF) {
+                        sec_name = "UNDEF";
+                    } 
+                    //constant sym like end
+                    else if (sym->st_shndx == SHN_ABS) {
+                        sec_name = "ABS";
+                    } 
+                    //global vars which we didnt initilize yet like int x;
+                    else if (sym->st_shndx == SHN_COMMON) {
+                        sec_name = "COMMON";
+                    } 
+                    else if (sym->st_shndx < header->e_shnum) {
+                        //shndx which section this symbol in.
+                        //sections headers[index] is symtab 
+                        //shname is the offset of symbol name in the sections names table
+                        //section headers[index].sh_name is where the exact relevant name is for this symbol's section name.
+                        sec_name = shstrtab + section_headers[sym->st_shndx].sh_name;
+                    } 
+                    else {
+                        sec_name = "UNKNOWN";
+                    }
+
+                    printf("[%2d] %08x %7d  %-20s %s\n", k, sym->st_value, sym->st_shndx, sec_name, sym_name);
+                }
+                printf("\n");
+            }
+        }
+    }
 }
 
 void print_relocations() {
