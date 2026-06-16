@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <elf.h>
+
+//part0
 //not allowed to use read,fread
 
 //menu technique as in lab1
@@ -74,7 +76,6 @@ void examine_elf() {
 
 
 
-
 //saving map details for cuurent file then saving it in arrays 
     //st.size is stat struct feature
     int size = fd_stat.st_size;
@@ -98,11 +99,6 @@ void examine_elf() {
     
     //treat the pointer we got and get its *header*
     Elf32_Ehdr *header = (Elf32_Ehdr *)map;/**/
-
-
-
-
-
 
 
 
@@ -156,11 +152,6 @@ void examine_elf() {
 
 
 
-
-
-
-
-
 //Quit should unmap and close any mapped or open files, and "exit normally".
 void quit() {
     if (debug_mode) {
@@ -180,10 +171,82 @@ void quit() {
 }
 
 
+//part1
+/*
+For each ELF file already opened by Examine ELF File
+ Print Section Names should visit all section headers in the section header table,
+  and for each one print its index, name, address, offset, size in bytes, and type *number*. 
+ The format for each ELF file should be:
+File <ELF-file-name> sections:
+[index] section_name section_address section_offset section_size  section_type
+[index] section_name section_address section_offset section_size  section_type
+[index] section_name section_address section_offset section_size  section_type
+*/
 
-void print_sections() {
-    printf("not implemented yet\n");
+ //so there is no file just print an error message and return.
+void print_sections(void) {
+    if (num_files == 0) {
+        printf("Error: No ELF files currently mapped. Please examine a file first.\n");
+        return;
+    }
+
+    //Note that this is done for all files currently mapped,
+    for (int i = 0; i < num_files; i++) {
+        printf("File %s sections:\n", file_names[i]);
+        
+        //map we got from mmap - elf data from global array 
+        //mmap give us all elf data, casting of header will make it see obly the first 52 bytes which are the header data
+        void *map = map_start[i];
+        Elf32_Ehdr *header = (Elf32_Ehdr *)map;
+        
+        //e_shoff is num of bytes to get to sections table,
+        //cast map to char in order to perform ptrs arithmetic 
+        //shdr is struct for single section in linux
+        //sections headrs are array of shdrs 
+        Elf32_Shdr *section_headers = (Elf32_Shdr *)((char *)map + header->e_shoff);
+        
+        //find sections names which stored in shstrtab section 
+        //this index says which section number is shstrtab aka sectionsNamesTableSection (haha)
+        int shstrndx = header->e_shstrndx; 
+        //the adress of section in this index(the d)
+        Elf32_Shdr *shstrtab_section = &section_headers[shstrndx]; 
+        char *shstrtab = (char *)map + shstrtab_section->sh_offset; 
+
+        
+        //In debug mode you should also print the value of the important indices and offsets,
+        // such as shstrndx 
+        if (debug_mode) {
+            fprintf(stderr, "Debug: shstrndx (Section Header String Table Index) = %d\n", shstrndx);
+        }
+        //print sections data
+        printf("[index] Name                 Addr       Off    Size   Type\n");
+
+        //e_shnum aka total num of sections in the elf file
+        for (int j = 0; j < header->e_shnum; j++) {
+            //& aka from struct to pointer
+            Elf32_Shdr *section = &section_headers[j];
+            
+            //sh_name is the offset for the name of the section 
+            //(the num of bytes from the beggining of shstrtab)
+            //c treats it as string name
+            char *name = shstrtab + section->sh_name;
+            
+            //section name offsets.
+            if (debug_mode) {
+                fprintf(stderr, "Debug: Section [%d] name offset = %d\n", j, section->sh_name);
+            }
+            //use shdr features to print rewuires data: sh_addr etc
+            //type is saved as number and in readelf its translated to string but in here its not required
+            //- for left allignment
+            printf("[%2d]    %-20s %08x %06x %06x   %x\n", j, name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_type);
+        }
+        printf("\n");
+    }
 }
+
+
+
+
 
 void print_symbols() {
     printf("not implemented yet\n");
