@@ -199,7 +199,7 @@ void print_sections(void) {
         void *map = map_start[i];
         Elf32_Ehdr *header = (Elf32_Ehdr *)map;
         
-        //e_shoff is num of bytes to get to sections table,
+        //e_shoff is num of bytes to get to sections table form the start of table?
         //cast map to char in order to perform ptrs arithmetic 
         //shdr is struct for single section in linux
         //sections headrs are array of shdrs 
@@ -335,9 +335,89 @@ void print_symbols() {
     }
 }
 
+//par2b
 void print_relocations() {
-    printf("not implemented yet\n");
+    if (num_files == 0) {
+        printf("Error: No ELF files currently mapped.\n");
+        return;
+    }
+
+    for (int i = 0; i < num_files; i++) {
+        //find the sections name table for relocations who represent a whole section:
+        void *map = map_start[i];
+        Elf32_Ehdr *header = (Elf32_Ehdr *)map;
+        Elf32_Shdr *section_headers = (Elf32_Shdr *)((char *)map + header->e_shoff);
+        Elf32_Shdr *shstrtab_section = &section_headers[header->e_shstrndx];
+        char *shstrtab = (char *)map + shstrtab_section->sh_offset;
+        //now we have the sectionsNamesTableSection as string in shstrtab
+ 
+        int found_rels = 0;
+        //iterate sections to find relocations section
+        for (int j = 0; j < header->e_shnum; j++) {
+            Elf32_Shdr *current_section = &section_headers[j];
+            if (current_section->sh_type == SHT_REL) {
+                found_rels ++;
+                char *rel_sec_name = shstrtab + current_section->sh_name;
+                int num_relocations = current_section->sh_size / current_section->sh_entsize;
+
+
+                //if we found rel section save its data and find his symbol table
+                Elf32_Rel *relocations = (Elf32_Rel *)((char *)map + current_section->sh_offset);
+                ////this is the symbol table section that contains the symbols our relocations refer to:
+                Elf32_Shdr *symtab_section = &section_headers[current_section->sh_link];
+                //actual symbol table:
+                Elf32_Sym *symtab = (Elf32_Sym *)((char *)map + symtab_section->sh_offset);
+                //dictionary for the symbol table we just found:
+                Elf32_Shdr *strtab_section = &section_headers[symtab_section->sh_link];
+                //string for the actual names in the symbol table
+                char *strtab = (char *)map + strtab_section->sh_offset;
+                //we need this bc in the relocations next loop we can use the index in r_info in order to have sym struct of relevant symbol. 
+
+                if (debug_mode) {
+                    int symtab_size = symtab_section->sh_size;
+                    int num_symbols = symtab_size / symtab_section->sh_entsize;
+                    fprintf(stderr, "Debug: Symbol table size: %d, number of symbols: %d\n", symtab_size, num_symbols);
+                }
+                printf("File %s relocations:\n", file_names[i]);
+                printf("[index] location   related_symbol_name      type\n");
+                //iterate relocations in the rel section
+                for (int k = 0; k < num_relocations; k++) {
+                    Elf32_Rel *rel = &relocations[k];
+                    //extract relevant info from r_info:
+                    //index in the symbol table
+                    int sym_index = ELF32_R_SYM(rel->r_info);
+                    int rel_type = ELF32_R_TYPE(rel->r_info);
+                    //symbol for current relocation:
+                    Elf32_Sym *sym = &symtab[sym_index];
+                    char *sym_name = "";
+                    //st_name is for where the name of the symbol starts
+                    if (sym->st_name != 0) {
+                        sym_name = strtab + sym->st_name;
+                    } 
+                    //if st_name==0 the relocation represent section,
+                    //extract the section name:
+                    else if (sym->st_shndx < header->e_shnum) {
+                        sym_name = shstrtab + section_headers[sym->st_shndx].sh_name;
+                    }
+                    printf("[%2d]    %08x   %-24s %d\n", k, rel->r_offset, sym_name, rel_type);
+                }
+                printf("\n");
+            }
+        }
+        if (found_relocs == 0) {
+            printf("No relocations\n");
+        }
+    }
 }
+
+
+
+
+
+
+
+
+
 
 void check_files() {
     printf("not implemented yet\n");
