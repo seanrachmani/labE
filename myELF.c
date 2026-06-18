@@ -513,11 +513,141 @@ void check_merge() {
 }
 
 
-
-
+//part 3.2
 void merge() {
-    printf("not implemented yet\n");
+    //sanity Check - verify we have exactly 2 files
+    if (num_files != 2) {
+        printf("Error: Exactly 2 ELF files must be mapped for merge.\n");
+        return;
+    }
+
+
+    //variables for data of both files
+    //where our files start
+    void *map1 = map_start[0];
+    void *map2 = map_start[1];
+    //ptrs to headers struct of the files
+    Elf32_Ehdr *ehdr1 = (Elf32_Ehdr *)map1;
+    Elf32_Ehdr *ehdr2 = (Elf32_Ehdr *)map2;
+    //e_shoff represents the section header table's file offset in bytes
+    //ptrd to sections tables:
+    Elf32_Shdr *shdrs1 = (Elf32_Shdr *)((char *)map1 + ehdr1->e_shoff);
+    Elf32_Shdr *shdrs2 = (Elf32_Shdr *)((char *)map2 + ehdr2->e_shoff);
+    //strings names of our dictionaries to the sections names of both files:
+    char *shstrtab1 = (char *)map1 + shdrs1[ehdr1->e_shstrndx].sh_offset;
+    char *shstrtab2 = (char *)map2 + shdrs2[ehdr2->e_shstrndx].sh_offset;
+
+
+
+    //create "out.ro" and copy an initial version of the ELF header as its header.
+    FILE *out_file = fopen("out.ro", "wb");
+    if (!out_file) {
+        printf("Error creating out.ro\n");
+        return;
+    }
+    Elf32_Ehdr merged_ehdr = *ehdr1;
+    //space saver for ELF HEADER
+    fwrite(&merged_ehdr, sizeof(Elf32_Ehdr), 1, out_file);
+
+
+    //memcpy(destination,source,size)
+    //create (in memory) an initial version of the section header table for the merged file by copying that of the first ELF file.
+    int num_sections = ehdr1->e_shnum;
+    Elf32_Shdr *merged_shdrs = malloc(num_sections * sizeof(Elf32_Shdr));
+    memcpy(merged_shdrs, shdrs1, num_sections * sizeof(Elf32_Shdr));
+
+
+
+    /*
+    Loop over the entries of the new section header table, 
+    and process each section according to the above scheme 
+    (concatenate ".text", copy ".shstrtab" as-is, etc.), 
+    and immediately write (append) the appropriate merged section to "out.ro".
+
+    shdr = section header
+    */
+    for (int i = 0; i < num_sections; i++) {
+        Elf32_Shdr *current_shdr = &merged_shdrs[i];
+
+        //skip the dummy NULL section
+        if (current_shdr->sh_type == SHT_NULL) {
+            continue; 
+        }
+
+        //update the appropriate section header table entry fields (offset)
+        //ftell tells us which byte we are now from the begining of the file
+        //so now we say wehre current section is starting 
+        current_shdr->sh_offset = ftell(out_file);
+
+
+        char *sec_name = shstrtab1 + current_shdr->sh_name;
+        //mergable Sections (.text, .data, .rodata)
+        if (strcmp(sec_name, ".text") == 0 || strcmp(sec_name, ".data") == 0 || strcmp(sec_name, ".rodata") == 0) {
+
+            //to create the merged ".text" section, copy the contents of ".text" from the first ELF file, 
+            fwrite((char *)map1 + shdrs1[i].sh_offset, 1, shdrs1[i].sh_size, out_file);
+            /*
+            and to that append the contents of ".text" from the second ELF file. 
+            */
+            // Instruction: "then find the contents... in the second ELF file"
+            Elf32_Shdr *sec2 = NULL;
+            for (int j = 0; j < ehdr2->e_shnum; j++) {
+                char *name2 = shstrtab2 + shdrs2[j].sh_name;
+                if (strcmp(sec_name, name2) == 0) {
+                    sec2 = &shdrs2[j];
+                    break;
+                }
+            }
+
+            //fwrite(where to copy from,size of single element, how many elemnts, where to copy to)
+
+            if (sec2 != NULL) {
+                fwrite((char *)map2 + sec2->sh_offset, 1, sec2->sh_size, out_file);
+                //The merged section obviously has a size that is the sum of the sizes (should accordingly change the appropriate section header).
+                current_shdr->sh_size = shdrs1[i].sh_size + sec2->sh_size;
+            }
+        } 
+
+        //non-Mergable sections (copy as-is) - symbols, relocations, shstrtab etc..
+        else {
+            fwrite((char *)map1 + shdrs1[i].sh_offset, 1, shdrs1[i].sh_size, out_file);
+            //size remains the same as file 1
+        }
+    }
+
+
+
+
+    
+    //save the current location before writing the table, so we can use it in step 5
+    int new_shoff_location = ftell(out_file); 
+   //write the merged (and modified) section header table entry, appended to the end of "out.ro".
+    fwrite(merged_shdrs, sizeof(Elf32_Shdr), num_sections, out_file);
+
+
+    /*
+    ELF Header -> ACTUAL DATA OF Sections we finished to copy -> Sections Header Table = table of contents
+    now we are in the start of Sections Header Table = shoff
+    */
+
+    //fix the "e_shoff" field in ELF header of "out.ro" to point to the location where you actually wrote the section header table, and close "out.ro".
+    merged_ehdr.e_shoff = new_shoff_location;
+    
+    //overwrite the initial header we placed as space saver
+    //go back to begining - ELF header is always at byte 0 fseek(target file, how much bytes to go from, where to srart counting)
+    fseek(out_file, 0, SEEK_SET);
+
+    //updated e_shoff
+    fwrite(&merged_ehdr, sizeof(Elf32_Ehdr), 1, out_file);
+
+    fclose(out_file);
+    free(merged_shdrs);
+    if(debug_mode){
+            printf("Merge completed\n");
+    }
+
 }
+
 
     struct fun_desc menu1[] = { 
     { "Toggle <D>ebug Mode", 'D', toggle_debug_mode }, 
