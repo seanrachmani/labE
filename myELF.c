@@ -434,7 +434,7 @@ Elf32_Sym* find_symbol_by_name(char *target_name, Elf32_Sym *symtab, int num_sym
     return NULL; // Symbol not found
 }
 
-void check_merge(void) {
+void check_merge() {
     //assume there are exactly 2 files
     if (num_files != 2) {
         printf("feature not supported\n");
@@ -463,7 +463,7 @@ void check_merge(void) {
             }
         }
         if (symtab_count != 1) {
-            printf("feature not supported.\n", i+1, symtab_count);
+            printf("feature not supported.\n");
             return;
         }
     }
@@ -471,7 +471,7 @@ void check_merge(void) {
     //the merge (Looping over files symbols using helper function)
     for (int i = 0; i < 2; i++) {
         int other_file;
-        if(i = 0){
+        if(i == 0){
             other_file = 1;
         }
         else{
@@ -514,10 +514,6 @@ void check_merge(void) {
 
 
 
-//
-void check_merge() {
-    printf("not implemented yet\n");
-}
 
 void merge() {
     printf("not implemented yet\n");
