@@ -14,7 +14,7 @@
 struct fun_desc {
 char *name;
 char index;
-char (*fun)(void);
+void (*fun)(void);
 };
 
 
@@ -357,7 +357,6 @@ void print_relocations() {
             Elf32_Shdr *current_section = &section_headers[j];
             if (current_section->sh_type == SHT_REL) {
                 found_rels ++;
-                char *rel_sec_name = shstrtab + current_section->sh_name;
                 int num_relocations = current_section->sh_size / current_section->sh_entsize;
 
 
