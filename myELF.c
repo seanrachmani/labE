@@ -155,7 +155,7 @@ void examine_elf() {
 //Quit should unmap and close any mapped or open files, and "exit normally".
 void quit() {
     if (debug_mode) {
-        printf("Quitting... Cleaning up open files and memory.\n");
+        printf("Quitting.\n");
     }
 
     for (int i = 0; i < num_files; i++) {
@@ -404,7 +404,7 @@ void print_relocations() {
                 printf("\n");
             }
         }
-        if (found_relocs == 0) {
+        if (found_rels == 0) {
             printf("No relocations\n");
         }
     }
