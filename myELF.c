@@ -411,15 +411,111 @@ void print_relocations() {
 }
 
 
+/*=====================================part3====================*/
+/*
+part 3.1 - LINKERR PASS 1
+goal: check each symbol is defined exactly once
+*/
+
+//helper function to find a symbol by its name in a given symbol table
+//purpose: search in symtab the target_name and returns returns refrence to it if exist(NULL otherwise)
+//symtab is an array of sym (ptr in c is like array )
+//strtab is starting point(adress) of the string which is the dictionary of symbols
+Elf32_Sym* find_symbol_by_name(char *target_name, Elf32_Sym *symtab, int num_syms, char *strtab) {
+    for (int i = 1; i < num_syms; i++) { //skip dummy symbol 0
+        Elf32_Sym *current_sym = &symtab[i];
+        char *current_name = strtab + current_sym->st_name;
+        
+        // If names match and it's not a null string
+        if (current_sym->st_name != 0 && strcmp(target_name, current_name) == 0) {
+            return current_sym;
+        }
+    }
+    return NULL; // Symbol not found
+}
+
+void check_merge(void) {
+    //assume there are exactly 2 files
+    if (num_files != 2) {
+        printf("feature not supported\n");
+        return;
+    }
+
+    //array of sym struct for symtabs data
+    Elf32_Sym *symtabs[2] = {NULL, NULL};
+    char *strtabs[2] = {NULL, NULL};
+    int num_symbols[2] = {0, 0};
+
+    //extract Data for both files aka fill in the data about both file symtabs, dictionarys and num symbols
+    for (int i = 0; i < 2; i++) {
+        void *map = map_start[i];
+        Elf32_Ehdr *header = (Elf32_Ehdr *)map;
+        Elf32_Shdr *section_headers = (Elf32_Shdr *)((char *)map + header->e_shoff);
+        int symtab_count = 0;
+        for (int j = 0; j < header->e_shnum; j++) {
+            Elf32_Shdr *current_section = &section_headers[j];
+            if (current_section->sh_type == SHT_SYMTAB) {
+                symtab_count++;
+                symtabs[i] = (Elf32_Sym *)((char *)map + current_section->sh_offset);
+                num_symbols[i] = current_section->sh_size / current_section->sh_entsize;
+                Elf32_Shdr *strtab_section = &section_headers[current_section->sh_link];
+                strtabs[i] = (char *)map + strtab_section->sh_offset;
+            }
+        }
+        if (symtab_count != 1) {
+            printf("feature not supported.\n", i+1, symtab_count);
+            return;
+        }
+    }
+
+    //the merge (Looping over files symbols using helper function)
+    for (int i = 0; i < 2; i++) {
+        int other_file;
+        if(i = 0){
+            other_file = 1;
+        }
+        else{
+            other_file = 0;
+        }
+        Elf32_Sym *current_symtab = symtabs[i];
+        //doctionary for looking the sym name: 
+        char *current_strtab = strtabs[i];
+        Elf32_Sym *other_symtab = symtabs[other_file];
+        char *other_strtab = strtabs[other_file];
+
+        //iterate all symbols in current file(except dummy 0)
+        for (int j = 1; j < num_symbols[i]; j++) {
+            Elf32_Sym *current_sym = &current_symtab[j];
+            
+            //skip symbols without names
+            if (current_sym->st_name != 0){
+                char *sym_name = current_strtab + current_sym->st_name;
+                
+                //search sym in the other file's symbol table - helper func
+                Elf32_Sym *found_sym = find_symbol_by_name(sym_name, other_symtab, num_symbols[other_file], other_strtab);
+
+                //checking the conditions
+                int is_undef_current = (current_sym->st_shndx == SHN_UNDEF);
+                int is_undef_other = (found_sym != NULL && found_sym->st_shndx == SHN_UNDEF);
+
+                //error 1: Symbol undefined
+                if (is_undef_current && (found_sym == NULL || is_undef_other)) {
+                    printf("Symbol %s undefined\n", sym_name);
+                }
+                //error 2: Multiply defined
+                else if (!is_undef_current && (found_sym != NULL && !is_undef_other)) {
+                    printf("Symbol %s multiply defined\n", sym_name);
+                }
+            }
+
+        }
+    }
+}
 
 
 
-
-
-
-
-
-void check_files() {
+//
+void check_merge() {
     printf("not implemented yet\n");
 }
 
@@ -433,7 +529,7 @@ void merge() {
     { "Print Section <N>ames", 'N', print_sections }, 
     { "Print <S>ymbols", 'S', print_symbols }, 
     { "Print <R>elocations", 'R', print_relocations }, 
-    { "<C>heck Files for Merge", 'C', check_files }, 
+    { "<C>heck Files for Merge", 'C', check_merge }, 
     { "<M>erge ELF Files", 'M', merge }, 
     { "<Q>uit", 'Q', quit },
     { NULL, 0, NULL }
